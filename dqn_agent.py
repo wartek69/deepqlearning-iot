@@ -8,7 +8,6 @@ from keras.models import load_model
 from collections import deque
 import numpy as np
 import random as random
-from numpy import array
 
 class DqnAgent:
 
@@ -22,13 +21,13 @@ class DqnAgent:
         self.epsilon = 1 #exploitation vs exploration -> 1 = exploration
         self.epsilon_decay = 0.995
         self.epsilon_min = 0.01
-        self.learning_rate = 0.001
+        self.learning_rate = 0.005
         # create neural network
         state_shape = self.env.observation_space.shape
         action_shape = self.env.action_space.n
         self.model = Sequential()
         self.model.add(Dense(32, input_dim=state_shape[0], activation="relu"))
-        self.model.add(Dense(32, activation="relu"))
+        self.model.add(Dense(16, activation="relu"))
         self.model.add(Dense(16, activation="relu"))
         self.model.add(Dense(action_shape))
         self.model.compile(loss="mean_squared_error",
@@ -52,15 +51,22 @@ class DqnAgent:
             samples = random.sample(self.memory, 32)
         else:
             samples = random.sample(self.memory, len(self.memory))
+        states = []
+        targets = []
         for state, action, reward, new_state, done in samples:
             target = reward
             if not done:
                 target = reward + self.gamma * np.amax(self.model.predict(new_state)[0])
+            #keep the less optimal value, overwrite the better value
             future_target = self.model.predict(state)
             #action is a value between 0 and 1
             future_target[0][action] = target
-            # fit out of the lopo -> calculates overall gradient instead of gradient sample per sample
-            self.model.fit(state, future_target, epochs=1, verbose=0)
+
+            states.append(state[0])
+            targets.append(future_target[0])
+        # fit out of the lopo -> calculates overall gradient instead of gradient sample per sample
+        #self.model.train_on_batch(np.asarray(states), np.asarray(targets))
+        self.model.fit(np.asarray(states), np.asarray(targets), epochs=1, verbose=0)
         if self.epsilon > self.epsilon_min:
             self.epsilon *= self.epsilon_decay
 
@@ -107,7 +113,8 @@ def run_agent(env, training=False, number_of_episodes=100, model_name=None):
             state = new_state
             total_episode_reward += reward
             #replay in the loop gives more training
-            agent.replay()
+            if training:
+                agent.replay()
 
         print("Total reward for episode {} is {}".format(episode, total_episode_reward))
         total_reward += total_episode_reward
@@ -124,7 +131,7 @@ def main():
     env = gym.make("CartPole-v1")
 
     # Train the agent
-    run_agent(env, training=True, number_of_episodes=80)
+    run_agent(env, training=True, number_of_episodes=500)
 
     # Test performance of the agent
     run_agent(env, training=False, number_of_episodes=10)
