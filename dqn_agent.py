@@ -8,7 +8,7 @@ from keras.models import load_model
 from collections import deque
 import numpy as np
 import random as random
-
+from numpy import array
 
 class DqnAgent:
 
@@ -22,14 +22,14 @@ class DqnAgent:
         self.epsilon = 1 #exploitation vs exploration -> 1 = exploration
         self.epsilon_decay = 0.995
         self.epsilon_min = 0.01
-        self.learning_rate = 0.005
+        self.learning_rate = 0.001
         # create neural network
         state_shape = self.env.observation_space.shape
         action_shape = self.env.action_space.n
         self.model = Sequential()
-        self.model.add(Dense(64, input_dim=state_shape[0], activation="relu"))
-        self.model.add(Dense(64, activation="relu"))
+        self.model.add(Dense(32, input_dim=state_shape[0], activation="relu"))
         self.model.add(Dense(32, activation="relu"))
+        self.model.add(Dense(16, activation="relu"))
         self.model.add(Dense(action_shape))
         self.model.compile(loss="mean_squared_error",
                            optimizer=Adam(lr=self.learning_rate))
@@ -52,7 +52,6 @@ class DqnAgent:
             samples = random.sample(self.memory, 32)
         else:
             samples = random.sample(self.memory, len(self.memory))
-        #temp = []
         for state, action, reward, new_state, done in samples:
             target = reward
             if not done:
@@ -60,7 +59,7 @@ class DqnAgent:
             future_target = self.model.predict(state)
             #action is a value between 0 and 1
             future_target[0][action] = target
-            #temp.append((state, action, reward, new_state, done))
+            # fit out of the lopo -> calculates overall gradient instead of gradient sample per sample
             self.model.fit(state, future_target, epochs=1, verbose=0)
         if self.epsilon > self.epsilon_min:
             self.epsilon *= self.epsilon_decay
@@ -102,13 +101,13 @@ def run_agent(env, training=False, number_of_episodes=100, model_name=None):
                            reward=reward,
                            new_state=new_state,
                            done=done)
-
             if not training:
                 sleep(0.02)
                 env.render()
             state = new_state
             total_episode_reward += reward
-        agent.replay()
+            #replay in the loop gives more training
+            agent.replay()
 
         print("Total reward for episode {} is {}".format(episode, total_episode_reward))
         total_reward += total_episode_reward
